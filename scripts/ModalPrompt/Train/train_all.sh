@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# CL 顺序训练入口（task1 -> task8）。
+# 若需要 multitask 上界，请单独运行：
+#   sh scripts/ModalPrompt/Train/0_Multitask.sh
+
 sh ./scripts/ModalPrompt/Train/1_Science.sh
 sh ./scripts/ModalPrompt/Train/2_TextVQA.sh
 sh ./scripts/ModalPrompt/Train/3_ImageNet.sh

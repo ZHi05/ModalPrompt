@@ -9,10 +9,16 @@ CUR_TASK=$3
 NUM_TASKS=$4
 
 RESULT_DIR="./results/ModalPrompt/ImageNet"
+MODEL_BASE=${MODEL_BASE:-models/llava_v1.5-7b}
+if [ -n "$MODEL_BASE" ]; then
+    MODEL_BASE_ARGS="--model-base $MODEL_BASE"
+else
+    MODEL_BASE_ARGS=""
+fi
 
 CUDA_VISIBLE_DEVICES=0 python -m llava.eval.ModalPrompt.model_vqa_cc_imagenet \
     --model-path $MODELPATH \
-    --model-base models/llava_v1.5-7b \
+    $MODEL_BASE_ARGS \
     --question-file instructions/ImageNet/test.json \
     --image-folder datasets/ \
     --text-tower models/clip-vit-large-patch14-336 \
