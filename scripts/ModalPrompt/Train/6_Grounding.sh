@@ -9,8 +9,19 @@ MODEL_VERSION="vicuna-7b-v1.3"
 # MODEL_VERSION="Llama-2-7b-chat-hf"
 ################## LLaMA-2 ##################
 
-deepspeed --include localhost:0,1,2,3 --master_port 13200 llava/train/train_mem.py \
-    --deepspeed ./scripts/zero3_offload.json \
+# ===== Server tuning knobs (modify for your machine) =====
+# GPUS: comma-separated GPU ids, e.g. "0" (single card) or "0,1,2,3" (multi-card)
+# MASTER_PORT: deepspeed communication port (change if port conflict)
+# DS_CONFIG: deepspeed strategy; H20 96G recommended default is zero2
+#            optional: ./scripts/zero3.json or ./scripts/zero3_offload.json for tighter memory
+# TB_LOG_DIR: TensorBoard output directory
+GPUS=${GPUS:-0}
+MASTER_PORT=${MASTER_PORT:-13200}
+DS_CONFIG=${DS_CONFIG:-./scripts/zero2.json}
+TB_LOG_DIR=${TB_LOG_DIR:-runs/ModalPrompt/Grounding}
+
+deepspeed --include localhost:${GPUS} --master_port ${MASTER_PORT} llava/train/train_mem.py \
+    --deepspeed ${DS_CONFIG} \
     --lora_enable False --mm_projector_lr 2e-5 --pt_enable True \
     --model_name_or_path models/llava_v1.5-7b \
     --previous_task_model_path checkpoints/ModalPrompt/VizWiz/llava-1.5-7b \
@@ -48,4 +59,5 @@ deepspeed --include localhost:0,1,2,3 --master_port 13200 llava/train/train_mem.
     --gradient_checkpointing True \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
-    --report_to none
+    --report_to tensorboard \
+    --logging_dir ${TB_LOG_DIR}

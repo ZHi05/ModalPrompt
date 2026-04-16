@@ -9,7 +9,7 @@
   "freeze_mm_vision_resampler": false,
   "hidden_act": "silu",
   "hidden_size": 4096,
-  "image_aspect_ratio": pad,
+  "image_aspect_ratio": "pad",
   "initializer_range": 0.02,
   "intermediate_size": 11008,
   "max_length": 4096,

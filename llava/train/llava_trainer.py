@@ -304,7 +304,7 @@ class LLaVATrainer(Trainer):
             if "embed_tokens.weight" in p_name:
                 hp = safe_get_full_fp32_param(param)
                 embed_tokens_mask = repeat(self.model.embed_tokens_mask_1d.to(hp.dtype).to(hp.device),'n -> n c', c =hp.shape[1])
-                reset_embed_tokens_weight = self.model.origin_embed_tokens_weights * (1- embed_tokens_mask) + hp.data * embed_tokens_mask
+                reset_embed_tokens_weight = self.model.origin_embed_tokens_weights.to(hp.device) * (1- embed_tokens_mask) + hp.data * embed_tokens_mask
                 safe_set_full_fp32_param(param, reset_embed_tokens_weight)
         # #  --------------------------- add for reset frozen embedding tokens ---------------
 
