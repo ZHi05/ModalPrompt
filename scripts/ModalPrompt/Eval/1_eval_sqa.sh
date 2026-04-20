@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 CHUNKS=1
 IDX=0
@@ -20,6 +21,7 @@ if [ -n "$MODEL_BASE" ]; then
 else
     MODEL_BASE_ARGS=""
 fi
+mkdir -p "$RESULT_DIR/$STAGE"
 
 CUDA_VISIBLE_DEVICES=0 python -m llava.eval.ModalPrompt.model_vqa_science \
     --model-path $MODELPATH \

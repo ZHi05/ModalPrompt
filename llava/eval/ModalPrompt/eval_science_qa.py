@@ -104,7 +104,19 @@ if __name__ == "__main__":
     multimodal_total = multimodal_correct + multimodal_incorrect
     ###### IMG ######
 
-    print(f'Total: {total}, Correct: {correct}, Accuracy: {correct / total * 100:.2f}%, IMG-Accuracy: {multimodal_correct / multimodal_total * 100:.2f}%')
+    if total == 0:
+        print("Total: 0, no valid predictions were produced.")
+        sqa_results['acc'] = 0.0
+        sqa_results['correct'] = 0
+        sqa_results['count'] = 0
+        with open(args.output_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        with open(args.output_result, 'w') as f:
+            json.dump(sqa_results, f, indent=2)
+        raise SystemExit(1)
+
+    img_acc = (multimodal_correct / multimodal_total * 100) if multimodal_total > 0 else 0.0
+    print(f'Total: {total}, Correct: {correct}, Accuracy: {correct / total * 100:.2f}%, IMG-Accuracy: {img_acc:.2f}%')
 
     sqa_results['acc'] = correct / total * 100
     sqa_results['correct'] = correct

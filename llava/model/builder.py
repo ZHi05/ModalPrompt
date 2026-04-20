@@ -123,7 +123,20 @@ def load_pretrained_model(model_path, model_base, model_name, prefix_len, cur_ta
                 model = LlavaMPTForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, **kwargs)
             else:
                 tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
-                model = LlavaLlamaForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, **kwargs)
+                model = ModalPrompt.from_pretrained(model_path, low_cpu_mem_usage=True, **kwargs)
+                if text_tower is None:
+                    raise ValueError("text_tower must be provided when loading ModalPrompt without model_base.")
+                clip_tokenizer = AutoTokenizer.from_pretrained(
+                    text_tower, cache_dir=None, model_max_length=77, padding_side="right", use_fast=True
+                )
+                # Zero-shot/base-model eval still uses ModalPrompt forward path, so continual runtime attrs must exist.
+                model.set_comtinual_eval(
+                    tokenizer=tokenizer,
+                    clip_tokenizer=clip_tokenizer,
+                    prefix_len=prefix_len,
+                    cur_task=cur_task,
+                    num_tasks=num_tasks,
+                )
     else:
         # Load language model
         if model_base is not None:
