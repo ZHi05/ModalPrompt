@@ -9,7 +9,12 @@ CUR_TASK=$3
 NUM_TASKS=$4
 
 RESULT_DIR="./results/ModalPrompt/ScienceQA"
-MODEL_BASE=${MODEL_BASE:-models/llava_v1.5-7b}
+# MODEL_BASE 参数语义：
+# - 未设置 MODEL_BASE：默认使用 models/llava_v1.5-7b（用于 CL checkpoint 评测）
+# - 显式设置 MODEL_BASE=""：不传 --model-base（用于 base 模型 zeroshot）
+if [ -z "${MODEL_BASE+x}" ]; then
+    MODEL_BASE="models/llava_v1.5-7b"
+fi
 if [ -n "$MODEL_BASE" ]; then
     MODEL_BASE_ARGS="--model-base $MODEL_BASE"
 else

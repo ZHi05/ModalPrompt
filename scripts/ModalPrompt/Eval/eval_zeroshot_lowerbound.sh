@@ -7,6 +7,9 @@ set -e
 #   sh scripts/ModalPrompt/Eval/eval_zeroshot_lowerbound.sh [MODEL_PATH]
 # Example:
 #   sh scripts/ModalPrompt/Eval/eval_zeroshot_lowerbound.sh models/llava_v1.5-7b
+# 参数约定：
+# - MODEL_PATH: 要直接评测的模型目录
+# - zeroshot 下不应传 --model-base（否则会走 CL checkpoint 加载分支）
 
 MODEL_PATH=${1:-models/llava_v1.5-7b}
 STAGE=ZeroShot

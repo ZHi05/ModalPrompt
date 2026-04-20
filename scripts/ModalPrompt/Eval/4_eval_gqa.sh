@@ -9,7 +9,9 @@ CUR_TASK=$3
 NUM_TASKS=$4
 
 RESULT_DIR="./results/ModalPrompt/GQA"
-MODEL_BASE=${MODEL_BASE:-models/llava_v1.5-7b}
+if [ -z "${MODEL_BASE+x}" ]; then
+    MODEL_BASE="models/llava_v1.5-7b"
+fi
 if [ -n "$MODEL_BASE" ]; then
     MODEL_BASE_ARGS="--model-base $MODEL_BASE"
 else
