@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+if [ "$#" -ne 4 ]; then
+  echo "Usage: sh scripts/ModalPrompt/Eval/1_eval_sqa.sh <STAGE> <MODEL_PATH> <CUR_TASK> <NUM_TASKS>"
+  exit 1
+fi
+
 CHUNKS=1
 IDX=0
 
@@ -54,4 +59,4 @@ python llava/eval/ModalPrompt/eval_science_qa.py \
     --base-dir  datasets/ScienceQA \
     --result-file $output_file \
     --output-file $RESULT_DIR/$STAGE/output.jsonl \
-    --output-result $RESULT_DIR/$STAGE/output_result.jsonl \
+    --output-result $RESULT_DIR/$STAGE/output_result.jsonl

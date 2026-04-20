@@ -1,4 +1,10 @@
 #!/bin/bash
+set -e
+
+if [ "$#" -ne 4 ]; then
+  echo "Usage: sh scripts/ModalPrompt/Eval/2_eval_textqa.sh <STAGE> <MODEL_PATH> <CUR_TASK> <NUM_TASKS>"
+  exit 1
+fi
 
 CHUNKS=1
 IDX=0
@@ -17,6 +23,7 @@ if [ -n "$MODEL_BASE" ]; then
 else
     MODEL_BASE_ARGS=""
 fi
+mkdir -p "$RESULT_DIR/$STAGE"
 
 CUDA_VISIBLE_DEVICES=0 python -m llava.eval.ModalPrompt.model_text_vqa \
     --model-path $MODELPATH \
@@ -48,4 +55,4 @@ done
 python -m llava.eval.ModalPrompt.eval_textvqa \
     --annotation-file datasets/TextVQA/TextVQA_0.5.1_val.json \
     --result-file $output_file \
-    --output-dir $RESULT_DIR/$STAGE \
+    --output-dir $RESULT_DIR/$STAGE
