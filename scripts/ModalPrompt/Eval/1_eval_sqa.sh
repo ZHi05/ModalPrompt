@@ -1,31 +1,32 @@
 #!/bin/bash
 set -e
 
-# Usage:
-#   sh scripts/ModalPrompt/Eval/1_eval_sqa.sh <stage> <model_path> <cur_task> <num_tasks>
-# Example (zeroshot):
-#   MODEL_BASE="" sh scripts/ModalPrompt/Eval/1_eval_sqa.sh zs models/llava-v1.5-7b 1 1
-
 if [ "$#" -ne 4 ]; then
-    echo "Usage: $0 <stage> <model_path> <cur_task> <num_tasks>"
-    exit 1
+  echo "Usage: sh scripts/ModalPrompt/Eval/1_eval_sqa.sh <STAGE> <MODEL_PATH> <CUR_TASK> <NUM_TASKS>"
+  exit 1
 fi
 
+CHUNKS=1
+IDX=0
+
 STAGE=$1
-MODEL_PATH=$2
+MODELPATH=$2
 CUR_TASK=$3
 NUM_TASKS=$4
 
+RESULT_DIR=${RESULT_DIR:-./results/ModalPrompt/ScienceQA}
+
+# MODEL_BASE 参数语义：
+# - 未设置 MODEL_BASE：默认使用 CL base
+# - 显式设置 MODEL_BASE=""：不传 --model-base（用于 zeroshot）
 MODEL_BASE_ARGS=""
-if [ "${MODEL_BASE+x}" = "x" ]; then
-    if [ -n "$MODEL_BASE" ]; then
-        MODEL_BASE_ARGS="--model-base $MODEL_BASE"
-    fi
-else
-    MODEL_BASE_ARGS="--model-base models/llava-v1.5-7b"
+if [ -z "${MODEL_BASE+x}" ]; then
+    MODEL_BASE="models/llava_v1.5-7b"
+fi
+if [ -n "$MODEL_BASE" ]; then
+    MODEL_BASE_ARGS="--model-base $MODEL_BASE"
 fi
 
-RESULT_DIR=${RESULT_DIR:-./results/ModalPrompt/ScienceQA}
 mkdir -p "$RESULT_DIR/$STAGE"
 
 MERGE_FILE="$RESULT_DIR/$STAGE/merge.jsonl"
@@ -44,10 +45,10 @@ rebuild_merge_if_needed() {
 
 run_analysis() {
     python llava/eval/ModalPrompt/eval_science_qa.py \
-        --base-dir ./playground/data/eval/scienceqa \
+        --base-dir datasets/ScienceQA \
         --result-file "$MERGE_FILE" \
-        --output-file "$ANALYSIS_FILE" \
-        --output-result "$RESULT_DIR/$STAGE/output_result.json"
+        --output-file "$RESULT_DIR/$STAGE/output.jsonl" \
+        --output-result "$ANALYSIS_FILE"
 }
 
 if [ -f "$ANALYSIS_FILE" ]; then
@@ -62,18 +63,20 @@ if [ -f "$MERGE_FILE" ] || has_chunks; then
     exit 0
 fi
 
-python -m llava.eval.ModalPrompt.model_vqa_science \
-    --model-path "$MODEL_PATH" \
+CUDA_VISIBLE_DEVICES=0 python -m llava.eval.ModalPrompt.model_vqa_science \
+    --model-path "$MODELPATH" \
     $MODEL_BASE_ARGS \
-    --question-file ./playground/data/eval/scienceqa/llava_test_CQM-A.json \
-    --image-folder ./playground/data/eval/scienceqa/images/test \
-    --answers-file "$RESULT_DIR/$STAGE/${NUM_TASKS}_${CUR_TASK}.jsonl" \
-    --single-pred-prompt \
+    --question-file instructions/ScienceQA/test.json \
+    --image-folder datasets/ \
+    --text-tower models/clip-vit-large-patch14-336 \
+    --prefix-len 10 \
+    --cur-task "$CUR_TASK" \
+    --num-task "$NUM_TASKS" \
+    --answers-file "$RESULT_DIR/$STAGE/${CHUNKS}_${IDX}.jsonl" \
+    --num-chunks "$CHUNKS" \
+    --chunk-idx "$IDX" \
     --temperature 0 \
-    --conv-mode vicuna_v1 \
-    --prefix_len 1 \
-    --cur_task "$CUR_TASK" \
-    --num_tasks "$NUM_TASKS"
+    --conv-mode vicuna_v1
 
 rebuild_merge_if_needed
 run_analysis

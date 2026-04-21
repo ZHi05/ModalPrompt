@@ -2,25 +2,31 @@
 set -e
 
 if [ "$#" -ne 4 ]; then
-    echo "Usage: $0 <stage> <model_path> <cur_task> <num_tasks>"
-    exit 1
+  echo "Usage: sh scripts/ModalPrompt/Eval/2_eval_textqa.sh <STAGE> <MODEL_PATH> <CUR_TASK> <NUM_TASKS>"
+  exit 1
 fi
 
+CHUNKS=1
+IDX=0
+
 STAGE=$1
-MODEL_PATH=$2
+MODELPATH=$2
 CUR_TASK=$3
 NUM_TASKS=$4
 
+RESULT_DIR=${RESULT_DIR:-./results/ModalPrompt/TextVQA}
+
+# MODEL_BASE 参数语义：
+# - 未设置 MODEL_BASE：默认使用 CL base
+# - 显式设置 MODEL_BASE=""：不传 --model-base（用于 zeroshot）
 MODEL_BASE_ARGS=""
-if [ "${MODEL_BASE+x}" = "x" ]; then
-    if [ -n "$MODEL_BASE" ]; then
-        MODEL_BASE_ARGS="--model-base $MODEL_BASE"
-    fi
-else
-    MODEL_BASE_ARGS="--model-base models/llava-v1.5-7b"
+if [ -z "${MODEL_BASE+x}" ]; then
+    MODEL_BASE="models/llava_v1.5-7b"
+fi
+if [ -n "$MODEL_BASE" ]; then
+    MODEL_BASE_ARGS="--model-base $MODEL_BASE"
 fi
 
-RESULT_DIR=${RESULT_DIR:-./results/ModalPrompt/TextVQA}
 mkdir -p "$RESULT_DIR/$STAGE"
 
 MERGE_FILE="$RESULT_DIR/$STAGE/merge.jsonl"
@@ -39,7 +45,7 @@ rebuild_merge_if_needed() {
 
 run_analysis() {
     python -m llava.eval.ModalPrompt.eval_textvqa \
-        --annotation-file ./playground/data/eval/textvqa/llava_textvqa_val_v051_ocr.json \
+        --annotation-file datasets/TextVQA/TextVQA_0.5.1_val.json \
         --result-file "$MERGE_FILE" \
         --output-dir "$RESULT_DIR/$STAGE"
 }
@@ -56,17 +62,20 @@ if [ -f "$MERGE_FILE" ] || has_chunks; then
     exit 0
 fi
 
-python -m llava.eval.ModalPrompt.model_vqa \
-    --model-path "$MODEL_PATH" \
+CUDA_VISIBLE_DEVICES=0 python -m llava.eval.ModalPrompt.model_text_vqa \
+    --model-path "$MODELPATH" \
     $MODEL_BASE_ARGS \
-    --question-file ./playground/data/eval/textvqa/llava_textvqa_val_v051.jsonl \
-    --image-folder ./playground/data/eval/textvqa/train_images \
-    --answers-file "$RESULT_DIR/$STAGE/${NUM_TASKS}_${CUR_TASK}.jsonl" \
+    --question-file instructions/TextVQA/val.json \
+    --image-folder datasets/ \
+    --text-tower models/clip-vit-large-patch14-336 \
+    --prefix-len 10 \
+    --cur-task "$CUR_TASK" \
+    --num-task "$NUM_TASKS" \
+    --answers-file "$RESULT_DIR/$STAGE/${CHUNKS}_${IDX}.jsonl" \
+    --num-chunks "$CHUNKS" \
+    --chunk-idx "$IDX" \
     --temperature 0 \
-    --conv-mode llava_v1 \
-    --prefix_len 1 \
-    --cur_task "$CUR_TASK" \
-    --num_tasks "$NUM_TASKS"
+    --conv-mode vicuna_v1
 
 rebuild_merge_if_needed
 run_analysis
