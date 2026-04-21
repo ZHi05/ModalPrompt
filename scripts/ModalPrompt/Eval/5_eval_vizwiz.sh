@@ -11,6 +11,9 @@ MODEL_PATH=$2
 CUR_TASK=$3
 NUM_TASKS=$4
 GPUS=${GPUS:-0}
+SEED=${SEED:-42}
+export PYTHONHASHSEED=${SEED}
+export CUBLAS_WORKSPACE_CONFIG=${CUBLAS_WORKSPACE_CONFIG:-:4096:8}
 
 MODEL_BASE_ARGS=""
 if [ "${MODEL_BASE+x}" = "x" ]; then
@@ -84,6 +87,9 @@ run_inference() {
     wait
 }
 
+# 跳过逻辑：
+# 1) 若最终分析文件已存在：直接退出，不再重复推理/分析。
+# 2) 若存在 merge 或分片输出：跳过推理，仅重跑分析（用于断点续跑）。
 if [ -f "$ANALYSIS_FILE" ]; then
     echo "已存在输出: $ANALYSIS_FILE"
     exit 0
