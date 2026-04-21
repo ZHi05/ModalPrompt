@@ -15,10 +15,14 @@ MODEL_VERSION="vicuna-7b-v1.5"
 # DS_CONFIG: deepspeed strategy; H20 96G recommended default is zero2
 #            optional: ./scripts/zero3.json or ./scripts/zero3_offload.json for tighter memory
 # TB_LOG_DIR: TensorBoard output directory
-GPUS=${GPUS:-0}
+# SEED: random seed for reproducibility
+# NUM_WORKERS: dataloader worker processes (128-core CPU can set larger values)
+GPUS=${GPUS:-0,1,2,3,4,5,6,7}
 MASTER_PORT=${MASTER_PORT:-13200}
 DS_CONFIG=${DS_CONFIG:-./scripts/zero2.json}
 TB_LOG_DIR=${TB_LOG_DIR:-runs/ModalPrompt/VQAv2}
+SEED=${SEED:-42}
+NUM_WORKERS=${NUM_WORKERS:-16}
 
 deepspeed --include localhost:${GPUS} --master_port ${MASTER_PORT} llava/train/train_mem.py \
     --deepspeed ${DS_CONFIG} \
@@ -55,9 +59,10 @@ deepspeed --include localhost:${GPUS} --master_port ${MASTER_PORT} llava/train/t
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
     --tf32 True \
+    --seed ${SEED} \
     --model_max_length 2048 \
     --gradient_checkpointing True \
-    --dataloader_num_workers 4 \
+    --dataloader_num_workers ${NUM_WORKERS} \
     --lazy_preprocess True \
     --report_to tensorboard \
     --logging_dir ${TB_LOG_DIR}
