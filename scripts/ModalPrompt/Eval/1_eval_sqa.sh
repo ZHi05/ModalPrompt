@@ -1,62 +1,76 @@
 #!/bin/bash
 set -e
 
+# Usage:
+#   sh scripts/ModalPrompt/Eval/1_eval_sqa.sh <stage> <model_path> <cur_task> <num_tasks>
+# Example (zeroshot):
+#   MODEL_BASE="" sh scripts/ModalPrompt/Eval/1_eval_sqa.sh zs models/llava-v1.5-7b 1 1
+
 if [ "$#" -ne 4 ]; then
-  echo "Usage: sh scripts/ModalPrompt/Eval/1_eval_sqa.sh <STAGE> <MODEL_PATH> <CUR_TASK> <NUM_TASKS>"
-  exit 1
+    echo "Usage: $0 <stage> <model_path> <cur_task> <num_tasks>"
+    exit 1
 fi
 
-CHUNKS=1
-IDX=0
-
 STAGE=$1
-MODELPATH=$2
+MODEL_PATH=$2
 CUR_TASK=$3
 NUM_TASKS=$4
 
-RESULT_DIR="./results/ModalPrompt/ScienceQA"
-# MODEL_BASE 参数语义：
-# - 未设置 MODEL_BASE：默认使用 models/llava_v1.5-7b（用于 CL checkpoint 评测）
-# - 显式设置 MODEL_BASE=""：不传 --model-base（用于 base 模型 zeroshot）
-if [ -z "${MODEL_BASE+x}" ]; then
-    MODEL_BASE="models/llava_v1.5-7b"
-fi
-if [ -n "$MODEL_BASE" ]; then
-    MODEL_BASE_ARGS="--model-base $MODEL_BASE"
+if [ "${MODEL_BASE+x}" = "x" ]; then
+    if [ -n "$MODEL_BASE" ]; then
+        MODEL_BASE_ARGS=(--model-base "$MODEL_BASE")
+    else
+        MODEL_BASE_ARGS=()
+    fi
 else
-    MODEL_BASE_ARGS=""
+    MODEL_BASE_ARGS=(--model-base "models/llava-v1.5-7b")
 fi
+
+RESULT_DIR=${RESULT_DIR:-./results/ModalPrompt/ScienceQA}
 mkdir -p "$RESULT_DIR/$STAGE"
 
-CUDA_VISIBLE_DEVICES=0 python -m llava.eval.ModalPrompt.model_vqa_science \
-    --model-path $MODELPATH \
-    $MODEL_BASE_ARGS \
-    --question-file instructions/ScienceQA/test.json \
-    --image-folder datasets/ \
-    --text-tower models/clip-vit-large-patch14-336 \
-    --prefix-len 10 \
-    --cur-task $CUR_TASK \
-    --num-task $NUM_TASKS \
-    --answers-file $RESULT_DIR/$STAGE/${CHUNKS}_${IDX}.jsonl \
-    --num-chunks $CHUNKS \
-    --chunk-idx $IDX \
+CHUNKS_GLOB="$RESULT_DIR/$STAGE/*_*.jsonl"
+MERGE_FILE="$RESULT_DIR/$STAGE/merge.jsonl"
+ANALYSIS_FILE="$RESULT_DIR/$STAGE/output_result.jsonl"
+
+rebuild_merge_if_needed() {
+    if compgen -G "$CHUNKS_GLOB" > /dev/null; then
+        cat $CHUNKS_GLOB > "$MERGE_FILE"
+    fi
+}
+
+run_analysis() {
+    python llava/eval/ModalPrompt/eval_science_qa.py \
+        --base-dir ./playground/data/eval/scienceqa \
+        --result-file "$MERGE_FILE" \
+        --output-file "$ANALYSIS_FILE" \
+        --output-result "$RESULT_DIR/$STAGE/output_result.json"
+}
+
+if [ -f "$ANALYSIS_FILE" ]; then
+    echo "已存在输出: $ANALYSIS_FILE"
+    exit 0
+fi
+
+if [ -f "$MERGE_FILE" ] || compgen -G "$CHUNKS_GLOB" > /dev/null; then
+    echo "检测到已有推理输出，跳过推理，仅执行结果分析..."
+    rebuild_merge_if_needed
+    run_analysis
+    exit 0
+fi
+
+python -m llava.eval.ModalPrompt.model_vqa_science \
+    --model-path "$MODEL_PATH" \
+    "${MODEL_BASE_ARGS[@]}" \
+    --question-file ./playground/data/eval/scienceqa/llava_test_CQM-A.json \
+    --image-folder ./playground/data/eval/scienceqa/images/test \
+    --answers-file "$RESULT_DIR/$STAGE/${NUM_TASKS}_${CUR_TASK}.jsonl" \
+    --single-pred-prompt \
     --temperature 0 \
-    --conv-mode vicuna_v1 &
+    --conv-mode vicuna_v1 \
+    --prefix_len 1 \
+    --cur_task "$CUR_TASK" \
+    --num_tasks "$NUM_TASKS"
 
-wait
-
-output_file=$RESULT_DIR/$STAGE/merge.jsonl
-
-# Clear out the output file if it exists.
-> "$output_file"
-
-# Loop through the indices and concatenate each file.
-for IDX in $(seq 0 $((CHUNKS-1))); do
-    cat $RESULT_DIR/$STAGE/${CHUNKS}_${IDX}.jsonl >> "$output_file"
-done
-
-python llava/eval/ModalPrompt/eval_science_qa.py \
-    --base-dir  datasets/ScienceQA \
-    --result-file $output_file \
-    --output-file $RESULT_DIR/$STAGE/output.jsonl \
-    --output-result $RESULT_DIR/$STAGE/output_result.jsonl
+rebuild_merge_if_needed
+run_analysis

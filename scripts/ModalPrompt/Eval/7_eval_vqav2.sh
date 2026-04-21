@@ -1,55 +1,78 @@
 #!/bin/bash
+set -e
+
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <stage> <model_path> <cur_task> <num_tasks>"
+    exit 1
+fi
 
 CHUNKS=1
 IDX=0
 
 STAGE=$1
-MODELPATH=$2
+MODEL_PATH=$2
 CUR_TASK=$3
 NUM_TASKS=$4
 
-RESULT_DIR="./results/ModalPrompt/VQAv2"
-if [ -z "${MODEL_BASE+x}" ]; then
-    MODEL_BASE="models/llava_v1.5-7b"
-fi
-if [ -n "$MODEL_BASE" ]; then
-    MODEL_BASE_ARGS="--model-base $MODEL_BASE"
+if [ "${MODEL_BASE+x}" = "x" ]; then
+    if [ -n "$MODEL_BASE" ]; then
+        MODEL_BASE_ARGS=(--model-base "$MODEL_BASE")
+    else
+        MODEL_BASE_ARGS=()
+    fi
 else
-    MODEL_BASE_ARGS=""
+    MODEL_BASE_ARGS=(--model-base "models/llava_v1.5-7b")
+fi
+
+RESULT_DIR=${RESULT_DIR:-./results/ModalPrompt/VQAv2}
+mkdir -p "$RESULT_DIR/$STAGE"
+
+CHUNKS_GLOB="$RESULT_DIR/$STAGE/*_*.jsonl"
+MERGE_FILE="$RESULT_DIR/$STAGE/merge.jsonl"
+ANALYSIS_FILE="$RESULT_DIR/$STAGE/Result.text"
+
+rebuild_merge_if_needed() {
+    if compgen -G "$CHUNKS_GLOB" > /dev/null; then
+        cat $CHUNKS_GLOB > "$MERGE_FILE"
+    fi
+}
+
+run_analysis() {
+    python scripts/convert_vqav2_for_submission.py \
+        --dir "$RESULT_DIR/$STAGE" \
+        --test-split instructions/VQAv2/val.json
+    python -m llava.eval.ModalPrompt.eval_vqav2 \
+        --annotation-file instructions/VQAv2/val.json \
+        --result-file "$MERGE_FILE" \
+        --output-dir "$RESULT_DIR/$STAGE"
+}
+
+if [ -f "$ANALYSIS_FILE" ]; then
+    echo "已存在输出: $ANALYSIS_FILE"
+    exit 0
+fi
+
+if [ -f "$MERGE_FILE" ] || compgen -G "$CHUNKS_GLOB" > /dev/null; then
+    echo "检测到已有推理输出，跳过推理，仅执行结果分析..."
+    rebuild_merge_if_needed
+    run_analysis
+    exit 0
 fi
 
 CUDA_VISIBLE_DEVICES=0 python -m llava.eval.ModalPrompt.model_vqa_cc_instruction \
-    --model-path $MODELPATH \
-    $MODEL_BASE_ARGS \
+    --model-path "$MODEL_PATH" \
+    "${MODEL_BASE_ARGS[@]}" \
     --question-file instructions/VQAv2/val.json \
     --image-folder datasets/ \
     --text-tower models/clip-vit-large-patch14-336 \
     --prefix-len 10 \
-    --cur-task $CUR_TASK \
-    --num-task $NUM_TASKS \
-    --answers-file $RESULT_DIR/$STAGE/${CHUNKS}_${IDX}.jsonl \
-    --num-chunks $CHUNKS \
-    --chunk-idx $IDX \
+    --cur-task "$CUR_TASK" \
+    --num-task "$NUM_TASKS" \
+    --answers-file "$RESULT_DIR/$STAGE/${CHUNKS}_${IDX}.jsonl" \
+    --num-chunks "$CHUNKS" \
+    --chunk-idx "$IDX" \
     --temperature 0 \
-    --conv-mode vicuna_v1 &
+    --conv-mode vicuna_v1
 
-wait
-
-output_file=$RESULT_DIR/$STAGE/merge.jsonl
-
-# Clear out the output file if it exists.
-> "$output_file"
-
-# Loop through the indices and concatenate each file.
-for IDX in $(seq 0 $((CHUNKS-1))); do
-    cat $RESULT_DIR/$STAGE/${CHUNKS}_${IDX}.jsonl >> "$output_file"
-done
-
-python scripts/convert_vqav2_for_submission.py \
-    --dir $RESULT_DIR/$STAGE \
-    --test-split instructions/VQAv2/val.json \
-
-python -m llava.eval.ModalPrompt.eval_vqav2 \
-    --annotation-file instructions/VQAv2/val.json \
-    --result-file $output_file \
-    --output-dir $RESULT_DIR/$STAGE \
+rebuild_merge_if_needed
+run_analysis
