@@ -6,13 +6,11 @@ if [ "$#" -ne 4 ]; then
     exit 1
 fi
 
-CHUNKS=1
-IDX=0
-
 STAGE=$1
 MODEL_PATH=$2
 CUR_TASK=$3
 NUM_TASKS=$4
+GPUS=${GPUS:-0}
 
 MODEL_BASE_ARGS=""
 if [ "${MODEL_BASE+x}" = "x" ]; then
@@ -28,6 +26,15 @@ mkdir -p "$RESULT_DIR/$STAGE"
 
 MERGE_FILE="$RESULT_DIR/$STAGE/merge.jsonl"
 ANALYSIS_FILE="$RESULT_DIR/$STAGE/Result.text"
+OLD_IFS=$IFS
+IFS=','
+set -- $GPUS
+IFS=$OLD_IFS
+CHUNKS=$#
+if [ "$CHUNKS" -lt 1 ]; then
+    echo "GPUS 参数无效: $GPUS"
+    exit 1
+fi
 
 has_chunks() {
     set -- "$RESULT_DIR/$STAGE"/*_*.jsonl
@@ -50,6 +57,32 @@ run_analysis() {
         --output-dir "$RESULT_DIR/$STAGE"
 }
 
+run_inference() {
+    OLD_IFS=$IFS
+    IFS=','
+    set -- $GPUS
+    IFS=$OLD_IFS
+    IDX=0
+    for GPU_ID in "$@"; do
+        CUDA_VISIBLE_DEVICES="$GPU_ID" python -m llava.eval.ModalPrompt.model_vqa_cc_instruction \
+            --model-path "$MODEL_PATH" \
+            $MODEL_BASE_ARGS \
+            --question-file instructions/VQAv2/val.json \
+            --image-folder datasets/ \
+            --text-tower models/clip-vit-large-patch14-336 \
+            --prefix-len 10 \
+            --cur-task "$CUR_TASK" \
+            --num-task "$NUM_TASKS" \
+            --answers-file "$RESULT_DIR/$STAGE/${CHUNKS}_${IDX}.jsonl" \
+            --num-chunks "$CHUNKS" \
+            --chunk-idx "$IDX" \
+            --temperature 0 \
+            --conv-mode vicuna_v1 &
+        IDX=$((IDX + 1))
+    done
+    wait
+}
+
 if [ -f "$ANALYSIS_FILE" ]; then
     echo "已存在输出: $ANALYSIS_FILE"
     exit 0
@@ -62,20 +95,7 @@ if [ -f "$MERGE_FILE" ] || has_chunks; then
     exit 0
 fi
 
-CUDA_VISIBLE_DEVICES=0 python -m llava.eval.ModalPrompt.model_vqa_cc_instruction \
-    --model-path "$MODEL_PATH" \
-    $MODEL_BASE_ARGS \
-    --question-file instructions/VQAv2/val.json \
-    --image-folder datasets/ \
-    --text-tower models/clip-vit-large-patch14-336 \
-    --prefix-len 10 \
-    --cur-task "$CUR_TASK" \
-    --num-task "$NUM_TASKS" \
-    --answers-file "$RESULT_DIR/$STAGE/${CHUNKS}_${IDX}.jsonl" \
-    --num-chunks "$CHUNKS" \
-    --chunk-idx "$IDX" \
-    --temperature 0 \
-    --conv-mode vicuna_v1
+run_inference
 
 rebuild_merge_if_needed
 run_analysis
