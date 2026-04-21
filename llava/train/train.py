@@ -25,6 +25,7 @@ from typing import Dict, Optional, Sequence, List
 import torch
 import sys
 import transformers
+from transformers.trainer_utils import get_last_checkpoint
 
 from llava.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from peft.utils import WEIGHTS_NAME, set_peft_model_state_dict
@@ -1031,7 +1032,17 @@ def train():
                     args=training_args,
                     **data_module)
 
-    trainer.train()
+    resume_checkpoint = getattr(training_args, "resume_from_checkpoint", None)
+    if resume_checkpoint in [None, ""]:
+        auto_resume = os.environ.get("AUTO_RESUME", "false").lower() in ["1", "true", "yes"]
+        if auto_resume and os.path.isdir(training_args.output_dir):
+            resume_checkpoint = get_last_checkpoint(training_args.output_dir)
+
+    if resume_checkpoint:
+        rank0_print(f"Resuming from checkpoint: {resume_checkpoint}")
+        trainer.train(resume_from_checkpoint=resume_checkpoint)
+    else:
+        trainer.train()
     trainer.save_state()
 
     model.config.use_cache = True

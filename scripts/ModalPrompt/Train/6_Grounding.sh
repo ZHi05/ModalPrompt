@@ -23,6 +23,12 @@ DS_CONFIG=${DS_CONFIG:-./scripts/zero2.json}
 TB_LOG_DIR=${TB_LOG_DIR:-runs/ModalPrompt/Grounding}
 SEED=${SEED:-42}
 NUM_WORKERS=${NUM_WORKERS:-16}
+SAVE_TOTAL_LIMIT=${SAVE_TOTAL_LIMIT:-2}
+RESUME_FROM_CHECKPOINT=${RESUME_FROM_CHECKPOINT:-}
+RESUME_ARGS=""
+if [ -n "$RESUME_FROM_CHECKPOINT" ]; then
+    RESUME_ARGS="--resume_from_checkpoint $RESUME_FROM_CHECKPOINT"
+fi
 
 deepspeed --include localhost:${GPUS} --master_port ${MASTER_PORT} llava/train/train_mem.py \
     --deepspeed ${DS_CONFIG} \
@@ -53,6 +59,7 @@ deepspeed --include localhost:${GPUS} --master_port ${MASTER_PORT} llava/train/t
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "epoch" \
+    --save_total_limit ${SAVE_TOTAL_LIMIT} \
     --learning_rate 2e-4 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
@@ -65,4 +72,5 @@ deepspeed --include localhost:${GPUS} --master_port ${MASTER_PORT} llava/train/t
     --dataloader_num_workers ${NUM_WORKERS} \
     --lazy_preprocess True \
     --report_to tensorboard \
+    $RESUME_ARGS \
     --logging_dir ${TB_LOG_DIR}
