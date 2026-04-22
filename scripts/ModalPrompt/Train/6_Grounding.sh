@@ -17,6 +17,7 @@ MODEL_VERSION="vicuna-7b-v1.3"
 # TB_LOG_DIR: TensorBoard output directory
 # SEED: random seed for reproducibility
 # NUM_WORKERS: dataloader worker processes (128-core CPU can set larger values)
+# NNODES/NODE_RANK/MASTER_ADDR/NUM_GPUS_PER_NODE: multi-node deepspeed parameters
 GPUS=${GPUS:-0,1,2,3,4,5,6,7}
 MASTER_PORT=${MASTER_PORT:-13200}
 DS_CONFIG=${DS_CONFIG:-./scripts/zero2.json}
@@ -30,7 +31,11 @@ if [ -n "$RESUME_FROM_CHECKPOINT" ]; then
     RESUME_ARGS="--resume_from_checkpoint $RESUME_FROM_CHECKPOINT"
 fi
 
-deepspeed --include localhost:${GPUS} --master_port ${MASTER_PORT} llava/train/train_mem.py \
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+source "${SCRIPT_DIR}/deepspeed_launch.sh"
+DS_LAUNCH_ARGS=$(build_deepspeed_launch_args "${GPUS}" "${MASTER_PORT}")
+
+deepspeed ${DS_LAUNCH_ARGS} llava/train/train_mem.py \
     --deepspeed ${DS_CONFIG} \
     --lora_enable False --mm_projector_lr 2e-5 --pt_enable True \
     --model_name_or_path models/llava_v1.5-7b \
