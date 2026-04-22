@@ -14,6 +14,8 @@ from llava.mm_utils import tokenizer_image_token, get_model_name_from_path, Keyw
 from PIL import Image
 import math
 
+from llava.eval.ModalPrompt.image_loader import ImagePrefetcher
+
 
 def split_list(lst, n):
     """Split a list into n (roughly) equal-sized chunks"""
@@ -38,6 +40,10 @@ def eval_model(args):
     answers_file = os.path.expanduser(args.answers_file)
     os.makedirs(os.path.dirname(answers_file), exist_ok=True)
     ans_file = open(answers_file, "w")
+    
+    # Initialize image prefetcher
+    prefetcher = ImagePrefetcher(args.image_folder, image_processor, cache_size=128, num_workers=8)
+    
     for i, line in enumerate(tqdm(questions)):
         idx = line["question_id"]
         question = line['text']
@@ -46,8 +52,7 @@ def eval_model(args):
 
         if 'image' in line.keys():
             image_file = line["image"]
-            image = Image.open(os.path.join(args.image_folder, image_file))
-            image_tensor = image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+            image_tensor = prefetcher.get(image_file)
             images = image_tensor.unsqueeze(0).half().cuda()
             if getattr(model.config, 'mm_use_im_start_end', False):
                 qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
@@ -128,6 +133,7 @@ def eval_model(args):
                                    "metadata": {}}) + "\n")
         ans_file.flush()
     ans_file.close()
+    prefetcher.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

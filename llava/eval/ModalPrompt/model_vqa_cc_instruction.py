@@ -13,6 +13,8 @@ from llava.utils import disable_torch_init
 from llava.mm_utils import tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
 from llava.model import *
 from PIL import Image
+
+from llava.eval.ModalPrompt.image_loader import ImagePrefetcher
 import math
 
 def split_list(lst, n):
@@ -41,6 +43,9 @@ def eval_model(args):
     answers_file = os.path.expanduser(args.answers_file)
     os.makedirs(os.path.dirname(answers_file), exist_ok=True)
     ans_file = open(answers_file, "w")
+
+    # Initialize image prefetcher
+    prefetcher = ImagePrefetcher(args.image_folder, image_processor, cache_size=128, num_workers=8)
     count = 0 
     for line in tqdm(questions):
         count += 1
@@ -61,8 +66,7 @@ def eval_model(args):
 
         input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).cuda()
 
-        image = Image.open(os.path.join(args.image_folder, image_file))
-        image_tensor = image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+        image_tensor = prefetcher.get(image_file)
 
         stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
         keywords = [stop_str]
@@ -99,6 +103,7 @@ def eval_model(args):
                                    "metadata": {}}) + "\n")
         ans_file.flush()
     ans_file.close()
+    prefetcher.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
