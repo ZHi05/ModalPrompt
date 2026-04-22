@@ -53,7 +53,7 @@ deepspeed --include localhost:${GPUS} --master_port ${MASTER_PORT} llava/train/t
     --group_by_modality_length True \
     --bf16 True \
     --output_dir checkpoints/ModalPrompt/GQA/llava-1.5-7b \
-    --num_train_epochs 10 \
+    --num_train_epochs 4 \
     --per_device_train_batch_size 24 \
     --per_device_eval_batch_size 16 \
     --gradient_accumulation_steps 1 \
