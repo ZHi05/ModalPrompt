@@ -91,8 +91,9 @@ def eval_model(args):
                 top_p=args.top_p,
                 num_beams=args.num_beams,
                 # no_repeat_ngram_size=3,
-                max_new_tokens=1024,
-                use_cache=True)
+                max_new_tokens=args.max_new_tokens,
+                use_cache=True,
+                stopping_criteria=[stopping_criteria])
 
         input_token_len = input_ids.shape[1]
         n_diff_input_output = (input_ids != output_ids[:, :input_token_len]).sum().item()
@@ -128,6 +129,7 @@ if __name__ == "__main__":
     parser.add_argument("--temperature", type=float, default=0)
     parser.add_argument("--top_p", type=float, default=None)
     parser.add_argument("--num_beams", type=int, default=1)
+    parser.add_argument("--max_new_tokens", type=int, default=128)
     parser.add_argument("--prefix-len", type=int, default=10)
     parser.add_argument("--cur-task", type=int, default=1)
     parser.add_argument("--num-tasks", type=int, default=8)
