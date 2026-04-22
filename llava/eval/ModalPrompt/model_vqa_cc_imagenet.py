@@ -12,8 +12,6 @@ from llava.model.builder import load_pretrained_model
 from llava.utils import disable_torch_init
 from llava.mm_utils import tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
 from llava.model import *
-from PIL import Image
-
 from llava.eval.ModalPrompt.image_loader import ImagePrefetcher
 import math
 template = "Choose an answer from the choices below: Doormat, Pomeranian, Chime, Golden retriever, Garden spider, Piggy bank, Walker hound, Castle, Chimpanzee, Sunscreen, Projectile, Accordion, Hand blower, Stupa, Kimono, German shepherd, Mouse, Maillot, Rotisserie, Earthstar, Television, Banjo, Jaguar, Cock, Goblet, Organ, Mortarboard, Hard disc, Red-backed sandpiper, Valley, Bow tie, Desk, Shopping basket, Marmoset, Mantis, Tiger beetle, Meat loaf, Curly-coated retriever, American black bear, Hyena, Spatula, Toaster, Cucumber, Espresso maker, Irish terrier, Fig, Tennis ball, Thatch, Spotted salamander, Dandie dinmont, Dalmatian, Sealyham terrier, Jack-o'-lantern, Hamper, Eggnog, Gordon setter, Water ouzel, Afghan hound, Sloth bear, Teapot, Standard poodle, Sunglass, Leafhopper, Barometer, Recreational vehicle, Cabbage butterfly, Poncho, Lampshade, Agaric, Koala, African crocodile, Envelope, Carpenter's kit, Old english sheepdog, Chocolate sauce, Dough, Bucket, Microphone, Lorikeet, Paddle, Crane2, Hip, Quail, Pickup, Beer glass, Face powder, Rottweiler, Tub, Head cabbage, Swing, Malamute, Damselfly, Hartebeest, Gondola, Hog, Web site, Whippet, Gasmask, Lemon, Bernese mountain dog."
@@ -46,9 +44,16 @@ def eval_model(args):
     ans_file = open(answers_file, "w")
 
     # Initialize image prefetcher
-    prefetcher = ImagePrefetcher(args.image_folder, image_processor, cache_size=128, num_workers=8)
+    prefetcher = ImagePrefetcher(
+        args.image_folder,
+        image_processor,
+        cache_size=128,
+        num_workers=args.prefetch_workers,
+    )
+    if questions:
+        prefetcher.prefetch([q["image"] for q in questions[:args.prefetch_window]])
     count = 0 
-    for line in tqdm(questions):
+    for i, line in enumerate(tqdm(questions)):
         count += 1
         idx = line["question_id"]
         image_file = line["image"]
@@ -69,6 +74,9 @@ def eval_model(args):
         input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).cuda()
 
         image_tensor = prefetcher.get(image_file)
+        next_idx = i + args.prefetch_window
+        if next_idx < len(questions):
+            prefetcher.prefetch([questions[next_idx]["image"]])
 
         stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
         keywords = [stop_str]
@@ -105,6 +113,7 @@ def eval_model(args):
                                    "metadata": {}}) + "\n")
         ans_file.flush()
     ans_file.close()
+    prefetcher.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -123,6 +132,8 @@ if __name__ == "__main__":
     parser.add_argument("--cur-task", type=int, default=1)
     parser.add_argument("--num-tasks", type=int, default=8)
     parser.add_argument("--text-tower", type=str)
+    parser.add_argument("--prefetch-workers", type=int, default=32)
+    parser.add_argument("--prefetch-window", type=int, default=64)
     
     args = parser.parse_args()
 

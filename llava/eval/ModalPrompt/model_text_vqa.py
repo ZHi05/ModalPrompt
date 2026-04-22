@@ -13,6 +13,7 @@ from llava.mm_utils import tokenizer_image_token, process_images, get_model_name
 from torch.utils.data import Dataset, DataLoader
 
 from PIL import Image
+
 import math
 
 
@@ -62,7 +63,7 @@ class CustomDataset(Dataset):
 
 
 # DataLoader
-def create_data_loader(questions, image_folder, tokenizer, image_processor, model_config, batch_size=1, num_workers=4):
+def create_data_loader(questions, image_folder, tokenizer, image_processor, model_config, batch_size=1, num_workers=32):
     assert batch_size == 1, "batch_size must be 1"
     dataset = CustomDataset(questions, image_folder, tokenizer, image_processor, model_config)
     data_loader = DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False)

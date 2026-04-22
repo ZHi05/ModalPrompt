@@ -11,7 +11,6 @@ from llava.model.builder import load_pretrained_model
 from llava.utils import disable_torch_init
 from llava.mm_utils import tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria
 
-from PIL import Image
 import math
 
 from llava.eval.ModalPrompt.image_loader import ImagePrefetcher
@@ -42,7 +41,15 @@ def eval_model(args):
     ans_file = open(answers_file, "w")
     
     # Initialize image prefetcher
-    prefetcher = ImagePrefetcher(args.image_folder, image_processor, cache_size=128, num_workers=8)
+    prefetcher = ImagePrefetcher(
+        args.image_folder,
+        image_processor,
+        cache_size=128,
+        num_workers=args.prefetch_workers,
+    )
+    images_to_prefetch = [q["image"] for q in questions[:args.prefetch_window] if "image" in q]
+    if images_to_prefetch:
+        prefetcher.prefetch(images_to_prefetch)
     
     for i, line in enumerate(tqdm(questions)):
         idx = line["question_id"]
@@ -53,6 +60,9 @@ def eval_model(args):
         if 'image' in line.keys():
             image_file = line["image"]
             image_tensor = prefetcher.get(image_file)
+            next_idx = i + args.prefetch_window
+            if next_idx < len(questions) and "image" in questions[next_idx]:
+                prefetcher.prefetch([questions[next_idx]["image"]])
             images = image_tensor.unsqueeze(0).half().cuda()
             if getattr(model.config, 'mm_use_im_start_end', False):
                 qs = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + qs
@@ -152,6 +162,8 @@ if __name__ == "__main__":
     parser.add_argument("--cur-task", type=int, default=1)
     parser.add_argument("--num-tasks", type=int, default=8)
     parser.add_argument("--text-tower", type=str)
+    parser.add_argument("--prefetch-workers", type=int, default=32)
+    parser.add_argument("--prefetch-window", type=int, default=64)
 
     args = parser.parse_args()
 
