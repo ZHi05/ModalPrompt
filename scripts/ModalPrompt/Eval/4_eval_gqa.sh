@@ -12,8 +12,11 @@ CUR_TASK=$3
 NUM_TASKS=$4
 GPUS=${GPUS:-0}
 SEED=${SEED:-42}
+GUIDANCE_MODE=${GUIDANCE_MODE:-dual}
+RESULT_ROOT=${RESULT_ROOT:-./results/ModalPrompt}
 export PYTHONHASHSEED=${SEED}
 export CUBLAS_WORKSPACE_CONFIG=${CUBLAS_WORKSPACE_CONFIG:-:4096:8}
+export TOKENIZERS_PARALLELISM=${TOKENIZERS_PARALLELISM:-false}
 
 MODEL_BASE_ARGS=""
 if [ "${MODEL_BASE+x}" = "x" ]; then
@@ -24,7 +27,7 @@ else
     MODEL_BASE_ARGS="--model-base models/llava_v1.5-7b"
 fi
 
-RESULT_DIR=${RESULT_DIR:-./results/ModalPrompt/GQA}
+RESULT_DIR=${RESULT_DIR:-${RESULT_ROOT}/GQA}
 mkdir -p "$RESULT_DIR/$STAGE"
 
 MERGE_FILE="$RESULT_DIR/$STAGE/merge.jsonl"
@@ -68,6 +71,7 @@ run_inference() {
             --question-file instructions/GQA/test.json \
             --image-folder datasets/ \
             --text-tower models/clip-vit-large-patch14-336 \
+            --guidance-mode "$GUIDANCE_MODE" \
             --prefix-len 10 \
             --cur-task "$CUR_TASK" \
             --num-task "$NUM_TASKS" \

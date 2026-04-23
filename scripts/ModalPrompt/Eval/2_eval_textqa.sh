@@ -12,10 +12,13 @@ CUR_TASK=$3
 NUM_TASKS=$4
 GPUS=${GPUS:-0}
 SEED=${SEED:-42}
+GUIDANCE_MODE=${GUIDANCE_MODE:-dual}
+RESULT_ROOT=${RESULT_ROOT:-./results/ModalPrompt}
 export PYTHONHASHSEED=${SEED}
 export CUBLAS_WORKSPACE_CONFIG=${CUBLAS_WORKSPACE_CONFIG:-:4096:8}
+export TOKENIZERS_PARALLELISM=${TOKENIZERS_PARALLELISM:-false}
 
-RESULT_DIR=${RESULT_DIR:-./results/ModalPrompt/TextVQA}
+RESULT_DIR=${RESULT_DIR:-${RESULT_ROOT}/TextVQA}
 
 # MODEL_BASE 参数语义：
 # - 未设置 MODEL_BASE：默认使用 CL base
@@ -73,6 +76,7 @@ run_inference() {
             --question-file instructions/TextVQA/val.json \
             --image-folder datasets/ \
             --text-tower models/clip-vit-large-patch14-336 \
+            --guidance-mode "$GUIDANCE_MODE" \
             --prefix-len 10 \
             --cur-task "$CUR_TASK" \
             --num-task "$NUM_TASKS" \

@@ -32,7 +32,7 @@ def eval_model(args):
     disable_torch_init()
     model_path = os.path.expanduser(args.model_path)
     model_name = get_model_name_from_path(model_path)
-    tokenizer, model, image_processor, context_len = load_pretrained_model(model_path, args.model_base, model_name, args.prefix_len, args.cur_task, args.num_tasks, args.text_tower)
+    tokenizer, model, image_processor, context_len = load_pretrained_model(model_path, args.model_base, model_name, args.prefix_len, args.cur_task, args.num_tasks, args.text_tower, guidance_mode=args.guidance_mode)
 
     questions = json.load(open(os.path.expanduser(args.question_file), "r"))
     questions = get_chunk(questions, args.num_chunks, args.chunk_idx)
@@ -162,6 +162,7 @@ if __name__ == "__main__":
     parser.add_argument("--cur-task", type=int, default=1)
     parser.add_argument("--num-tasks", type=int, default=8)
     parser.add_argument("--text-tower", type=str)
+    parser.add_argument("--guidance-mode", type=str, default="dual", choices=["dual", "image", "text"])
     parser.add_argument("--prefetch-workers", type=int, default=32)
     parser.add_argument("--prefetch-window", type=int, default=64)
 

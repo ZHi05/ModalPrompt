@@ -22,7 +22,7 @@ import torch
 from llava.model import *
 from llava.constants import DEFAULT_IMAGE_PATCH_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 
-def load_pretrained_model(model_path, model_base, model_name, prefix_len, cur_task, num_tasks, text_tower, load_8bit=False, load_4bit=False, device_map="auto", device="cuda", **kwargs):
+def load_pretrained_model(model_path, model_base, model_name, prefix_len, cur_task, num_tasks, text_tower, guidance_mode="dual", load_8bit=False, load_4bit=False, device_map="auto", device="cuda", **kwargs):
     kwargs = {"device_map": device_map, **kwargs}
 
     if device != "cuda":
@@ -185,5 +185,8 @@ def load_pretrained_model(model_path, model_base, model_name, prefix_len, cur_ta
         context_len = model.config.max_sequence_length
     else:
         context_len = 2048
+
+    if hasattr(model, "config"):
+        model.config.guidance_mode = guidance_mode
 
     return tokenizer, model, image_processor, context_len

@@ -209,9 +209,26 @@ class LlavaMetaForCausalLM(ABC):
         transfer_num = 3
         assert transfer_num in [1,2,3], "not implemented yet."
 
-        # bs, num_task
-        guide_coef = lam * cosine_similarity(repeat(image_guide_features,'b c -> b n c', n=self.cur_task), repeat(proto_embeddings, 'n c -> b n c', b = bs),dim=-1) + \
-                (1-lam) * cosine_similarity(repeat(text_guide_features,'b c -> b n c', n=self.cur_task), repeat(proto_embeddings, 'n c -> b n c', b = bs),dim=-1)
+        guidance_mode = getattr(self.config, "guidance_mode", "dual")
+        assert guidance_mode in ["dual", "image", "text"], "guidance_mode must be one of: dual, image, text."
+
+        image_guide_coef = cosine_similarity(
+            repeat(image_guide_features,'b c -> b n c', n=self.cur_task),
+            repeat(proto_embeddings, 'n c -> b n c', b = bs),
+            dim=-1
+        )
+        text_guide_coef = cosine_similarity(
+            repeat(text_guide_features,'b c -> b n c', n=self.cur_task),
+            repeat(proto_embeddings, 'n c -> b n c', b = bs),
+            dim=-1
+        )
+
+        if guidance_mode == "image":
+            guide_coef = image_guide_coef
+        elif guidance_mode == "text":
+            guide_coef = text_guide_coef
+        else:
+            guide_coef = lam * image_guide_coef + (1-lam) * text_guide_coef
 
         if self.training:
             if transfer_num ==1:
