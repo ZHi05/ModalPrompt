@@ -1,10 +1,9 @@
 import os
 import argparse
 import json
-import re
 from tqdm import tqdm
 
-from llava.eval.m4c_evaluator import TextVQAAccuracyEvaluator
+from llava.eval.m4c_evaluator import EvalAIAnswerProcessor
 
 
 def get_args():
@@ -17,19 +16,32 @@ def get_args():
 
 def eval_single(test_file, result_file):
     annotations = json.load(open(test_file))
-    answers = [test['answer'] for test in annotations]
+    annotations_by_qid = {
+        test['question_id']: test for test in annotations
+        if isinstance(test, dict) and 'question_id' in test
+    }
     results = [json.loads(line) for line in open(result_file)]
+    answer_processor = EvalAIAnswerProcessor()
 
     total = len(results)
     right = 0
     false_answers = []
     for index in tqdm(range(total)):
-        text = answers[index]
         label = results[index]
-        if (text in label['text']) or (label['text'] in text):
+        if annotations_by_qid:
+            annotation = annotations_by_qid[label['question_id']]
+            ground_truth = annotation['answer']
+        else:
+            ground_truth = annotations[index]['answer']
+
+        text = answer_processor(ground_truth)
+        pred = answer_processor(label['text'])
+        if pred == text or text in pred or pred in text:
             right += 1
         else:
-            label['ground_truth'] = text
+            label['ground_truth'] = ground_truth
+            label['ground_truth_norm'] = text
+            label['prediction_norm'] = pred
             false_answers.append(label)
         
     print('Samples: {}\nAccuracy: {:.2f}%\n'.format(total, 100. * right / total))

@@ -1,9 +1,8 @@
 import os
 import argparse
 import json
-import re
 
-from llava.eval.m4c_evaluator import TextVQAAccuracyEvaluator
+from llava.eval.m4c_evaluator import EvalAIAnswerProcessor
 
 
 def get_args():
@@ -17,15 +16,15 @@ def eval_single(annotation_file, result_file):
     annotations = json.load(open(annotation_file))
     annotations = {annotation['question_id']: annotation for annotation in annotations}
     results = [json.loads(line) for line in open(result_file)]
+    answer_processor = EvalAIAnswerProcessor()
 
-    pred_list = []
     total = len(results)
     right = 0
     for result in results:
         annotation = annotations[result['question_id']]
-        pred = result['text']
-        ground_truth = annotation['answer']
-        if pred.upper() == ground_truth.upper():
+        pred = answer_processor(result['text'])
+        ground_truth = answer_processor(annotation['answer'])
+        if pred == ground_truth:
             right += 1
 
     print('Samples: {}\nAccuracy: {:.2f}%\n'.format(total, 100. * right / total))
