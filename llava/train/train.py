@@ -62,6 +62,7 @@ class ModelArguments:
     prefix_len: Optional[int] = field(default=10)
     num_tasks: Optional[int] = field(default=8)
     transfer_num: Optional[int] = field(default=3)
+    guidance_mode: Optional[str] = field(default="dual")
     pretrain_mm_mlp_adapter: Optional[str] = field(default=None)
     mm_projector_type: Optional[str] = field(default='linear')
     mm_use_im_start_end: bool = field(default=False)
@@ -1001,6 +1002,7 @@ def train():
         model.config.mm_projector_lr = training_args.mm_projector_lr
         training_args.use_im_start_end = model_args.mm_use_im_start_end
         model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
+        model.config.guidance_mode = model_args.guidance_mode
         model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
 
     if training_args.bits in [4, 8]:

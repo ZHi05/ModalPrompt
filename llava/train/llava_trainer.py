@@ -269,7 +269,13 @@ class LLaVATrainer(Trainer):
             # We don't use .loss here since the model may return tuples instead of ModelOutput.
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
         
-        loss_total = loss + self.model.image_cos_sim_loss + self.model.text_cos_sim_loss
+        guidance_mode = getattr(self.model.config, "guidance_mode", "dual")
+        if guidance_mode == "image":
+            loss_total = loss + self.model.image_cos_sim_loss
+        elif guidance_mode == "text":
+            loss_total = loss + self.model.text_cos_sim_loss
+        else:
+            loss_total = loss + self.model.image_cos_sim_loss + self.model.text_cos_sim_loss
         
         return (loss_total, outputs) if return_outputs else loss_total
 
